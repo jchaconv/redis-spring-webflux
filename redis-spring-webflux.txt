@@ -1,0 +1,245 @@
+Redis with Spring WebFlux
+
+Repo de vinsguru: https://github.com/vinsguru/redis-webflux
+
+
+*******************************
+SECCIÓN 3: Redis - Crash Course
+*******************************
+
+
+docker-compose.yml
+
+version: '3'
+services:
+  redis:
+    container_name: redis
+    hostname: redis
+    image: redis:6.2
+    ports:
+    - 6379:6379
+
+Ejecutar en un cmd ubicado en la dirección del archivo yml:
+
+docker-compose up
+docker exec -it redis bash
+redis-cli
+ping → retorna PONG
+
+****************************************************************************
+
+Para comandos tener en cuenta la siguiente documentación:
+
+https://redis.io/commands/
+https://cheatography.com/tasjaevan/cheat-sheets/redis/
+
+
+#9. Storing Simple Key Values
+
+set a b → OK
+get a → "b"
+get c → (nil)
+set a 1 → "1" todo es representado como string
+
+Es case sensitive
+
+set user:1:name julio → OK
+get user:1:name → "julio"
+
+set somekey "some value" → para poder incluir espacios en blanco
+
+
+****************************************************************************
+
+#10. Accessing All Keys
+
+keys * → retorna todas las keys. No hacerlo si está integrado con aplicación
+keys user* → sigue un patrón con la palabra user
+scan 0 → muestra de 10 en 10 las keys y muestra al comienzo un número con el que se puede seguir navegando
+
+scan 0 MATCH user* → para listar y seguir patrón
+
+scan 6 MATCH user* count 3 → para listar solo 3 y no 10
+
+
+****************************************************************************
+
+#11. Removing Keys
+
+keys user*
+del user:8:name → 1
+del user:895:name → 0  nada que remover
+del user:1:name user:2:name → 2  borrado múltiple
+
+flushdb → remover todas las keys
+keys * → (empty array)
+
+El comando del no acepta un patrón, solo acepta keys.
+
+****************************************************************************
+
+#12. Expiring Keys - Part 1
+
+set a b ex 10 → expira en 10 secs
+keys *
+get a
+get a → luego de 10 secs ya no aparece
+
+
+set a b ex 10
+ttl a → 5  muestra cuantos secs quedan para que expire
+
+set a b ex 10
+ttl a → 7
+expire a 60 → extiendo el tiempo de expiración
+ttl a → 48
+
+expire a 600
+expire a 50 → puedo reducir el tiempo de esta manera
+
+
+****************************************************************************
+
+#13. Expiring Keys - Part 2
+
+key *
+set a b exat 1665619157 → para usar timestamp
+ttl a → 204
+
+set b c px 3000 → milisegundos
+get b → "c"
+get b → (nil)
+
+
+set a b ex 600
+ttl a → 580
+set a c
+ttl a → (integer) -1 ya está expirado
+flushdb
+
+Para mantener el tiempo de expirción:
+
+set a b ex 600
+ttl a → 580
+get a → "b"
+set a c keepttl
+
+
+****************************************************************************
+
+#14. Set Options - XX/NX
+
+set a b
+set a c
+get a → "c"
+flushdb
+
+set a b xx → (nil)  if is present
+get a → (nil)
+set a b nx → OK  if not present
+get a → "b"
+set a c nx → (nil)
+set a c xx → OK
+get a → "c"
+
+
+****************************************************************************
+
+#15. Exists Command
+
+keys *
+exists a → 1  existe 
+exists a → 0  no existe
+
+
+set user:1:session token
+set user:1:session token ex 10
+exists set user:1:session → 1
+exists set user:1:session → 1
+exists set user:1:session → 0
+
+
+****************************************************************************
+
+#16. INCR / DECR Commands
+
+SOLO para numéricos
+
+set a 1
+incr a → incrementa en 1 por defecto
+get a → "2"
+incr a
+get a → "3"
+
+set a b
+get a → "b"
+incr a → ERR
+
+flushdb
+incr bb → 1   si lo acepta, si no existe toma 0
+get bb → "1"
+incr bb
+
+decr bb
+incr prod:a:visit → 1
+incr prod:b:visit
+incr prod:c:visit
+incr prod:c:visit
+get prod:c:visit → 2 simulando los views de un producto
+
+set a 1.02
+get a
+incr a → ERR not an integer
+
+Para decimales:
+
+incrbyfloat a .3
+get a → "1.32"
+incrbyfloat a -.3
+get a → "1.02"
+incrbyfloat a -.3
+get a → "0.72"
+
+set abc 100
+incr abc → 101
+incrby abc 20 → 121
+incrby abc 20 → 141
+incrby abc 20 → 161
+
+
+****************************************************************************
+
+
+
+
+
+****************************************************************************
+
+
+
+
+
+****************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+**********************************
+SECCIÓN 4: Redisson - Crash Course
+**********************************
+
+Redisson es la librería de Java para usar Redis
+Otras librerías: Jedis y Lettuce
+
+Tener en cuenta la wiki:
+https://github.com/redisson/redisson/wiki
+
+
+
