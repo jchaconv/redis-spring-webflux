@@ -2,6 +2,13 @@ Redis with Spring WebFlux
 
 Repo de vinsguru: https://github.com/vinsguru/redis-webflux
 
+Redis use cases:
+-Caching
+-Pub/Sub
+-Message Queue
+-Streaming
+-GeoSpatial
+...
 
 *******************************
 SECCIÓN 3: Redis - Crash Course
@@ -26,13 +33,13 @@ docker exec -it redis bash
 redis-cli
 ping → retorna PONG
 
-****************************************************************************
-
-Para comandos tener en cuenta la siguiente documentación:
+Para comandos de redis tener en cuenta la siguiente documentación:
 
 https://redis.io/commands/
 https://cheatography.com/tasjaevan/cheat-sheets/redis/
 
+
+*******************************
 
 #9. Storing Simple Key Values
 
@@ -49,20 +56,19 @@ get user:1:name → "julio"
 set somekey "some value" → para poder incluir espacios en blanco
 
 
-****************************************************************************
+*******************************
+
 
 #10. Accessing All Keys
 
 keys * → retorna todas las keys. No hacerlo si está integrado con aplicación
 keys user* → sigue un patrón con la palabra user
 scan 0 → muestra de 10 en 10 las keys y muestra al comienzo un número con el que se puede seguir navegando
-
 scan 0 MATCH user* → para listar y seguir patrón
-
 scan 6 MATCH user* count 3 → para listar solo 3 y no 10
 
 
-****************************************************************************
+*******************************
 
 #11. Removing Keys
 
@@ -76,7 +82,8 @@ keys * → (empty array)
 
 El comando del no acepta un patrón, solo acepta keys.
 
-****************************************************************************
+*******************************
+
 
 #12. Expiring Keys - Part 1
 
@@ -85,20 +92,20 @@ keys *
 get a
 get a → luego de 10 secs ya no aparece
 
-
 set a b ex 10
 ttl a → 5  muestra cuantos secs quedan para que expire
 
 set a b ex 10
 ttl a → 7
-expire a 60 → extiendo el tiempo de expiración
-ttl a → 48
+expire a 60 → establezco el tiempo de expiración a 60secs
+ttl a → 58
 
 expire a 600
 expire a 50 → puedo reducir el tiempo de esta manera
 
 
-****************************************************************************
+*******************************
+
 
 #13. Expiring Keys - Part 2
 
@@ -110,14 +117,13 @@ set b c px 3000 → milisegundos
 get b → "c"
 get b → (nil)
 
-
 set a b ex 600
 ttl a → 580
 set a c
-ttl a → (integer) -1 ya está expirado
+ttl a → (integer) -1 ya está expirado porque se cambió el valor de la llave
 flushdb
 
-Para mantener el tiempo de expirción:
+Para mantener el tiempo de expiración:
 
 set a b ex 600
 ttl a → 580
@@ -125,9 +131,12 @@ get a → "b"
 set a c keepttl
 
 
-****************************************************************************
+*******************************
 
 #14. Set Options - XX/NX
+
+xx: is present
+nx: not present
 
 set a b
 set a c
@@ -142,8 +151,7 @@ set a c nx → (nil)
 set a c xx → OK
 get a → "c"
 
-
-****************************************************************************
+*******************************
 
 #15. Exists Command
 
@@ -159,7 +167,7 @@ exists set user:1:session → 1
 exists set user:1:session → 0
 
 
-****************************************************************************
+*******************************
 
 #16. INCR / DECR Commands
 
@@ -206,29 +214,337 @@ incrby abc 20 → 121
 incrby abc 20 → 141
 incrby abc 20 → 161
 
+*******************************
 
-****************************************************************************
+#19. Exercise - Rate Limit
 
-
-
-
-
-****************************************************************************
-
-
-
+set user:1:lives 3 ex 1800 → OK
+ttl user:1:lives → 1790
+decr user:1:lives → 2
+decr user:1:lives → 1
+decr user:1:lives → 0
 
 
-****************************************************************************
+*******************************
+
+#20. Hash - Part 1
+
+hset user:1 name sam age 10 city atlanta → 3 
+keys * → "user:1"
+get user:1 → WRONGTYPE
+type user:1 → hash
+hget user:1 → ERR wrong number of arguments ...
+hget user:1 name → "sam"
+hget user:1 age → "10"
+hgetall user:1 → Para ver un listado de los campos y valores 
+
+hset user:2 birthyear 2020 status active → 2
+hgetall user:2
+
+Recordar que no se trata de una tabla convencional, es un objeto
+que no debe mantener la misma estructura de campos
+
+*******************************
+
+#20. Hash - Part 2
+
+expire user:2 10 → 1
+ttl user:2 → 6
+keys* → "user:1"
+
+hkeys user:1 → retorna las keys
+hvals user:1 → retorna los valores
+hexists user:1 status → 0 (No existe el campo)
+hexists user:1 age → 1 (Si existe el campo)
+
+Para eliminar un campo:
+hdel user:1 age → 1
+hgetall user:1 → aparecen todos menos el key-value de age
+
+Para eliminar todo:
+del user:1 → 1
+keys * → empty array
+
+*******************************
+
+#22. List & Queue
+
+La lista en Redis puede ser usada como una Queue(First in - first out)
+
+rpush users julio ruti aaron → 3
+keys * → "users"
+get users → WRONGTYPE
+type users → list
+llen users → 3
+lrange 0 -1 → Retorna los nombres, arranca en índice 0 y se pone -1 cuando no se sabe la longitud exacta 
+lrange 0 1 → "julio" "ruti"
+
+lpop users → "julio" Significa que ha sido eliminado
+lrange 0 1 → "ruti" "aaron"
+lpop users → "ruti"
+lpop users → "aaron"
+lpop users → (nil)
+
+llen users → 0
+rpush users 1 2 3 4 5 6 → 6
+llen users → 6
+lpop users → "1"
+lpop users 2 → "2" "3"
+lrange users 0 -1 → "4" "5" "6"
+
+*******************************
+
+#24. List As Stack
+
+rpush users 1 2 → 2
+rpush users 3 4 → 4
+rpush users 5 → 5
+rpush users 6 → 6 No hay necesidad de crear la lista con todos los elementos, se pueden ir agregando
+llen users → 6 
+lrange users 0 -1 → se muestran todos los elementos
+
+rpop users → 6
+rpop users → 5
+rpop users → 4
+llen users → 3
+lrange users 0 -1 → "1" "2" "3"
+
+lpush users 4 → 4
+lrange users 0 -1 → "4" "1" "2" "3" El cuatro pasa a estar en la primera posición
+
+keys * → "users"
+lpop users → "4"
+lpop users → "1"
+lpop users → "2"
+llen users → 1
+lpop users → "3"
+keys * → (empty array) Si no hay datos en la lista es borrada automáticamente
+
+*******************************
+
+#25. Redis Set
+
+Similar a Java HashSet. Es una collección desordenada con items únicos(string)
+Use cases:
+- mantener el logueo de usuarios
+- blacklist de ip's
+- set intersection
+
+sadd users 1 2 3 → 3 Para crear un set
+sadd users 4 → 1
+sadd users 5 → 1
+scard users → 5 para ver la longitud del set
+smembers users → Se muestran todos los elementos del set
+
+sadd users 4.5 → 1
+sadd users 10 → 1
+smembers users → Se muestran todos los elementos sin un orden específico
+
+sadd users 1 → 0 
+sadd users 2 → 0
+sadd users 3 → 0 No se agregan registros porque no admite duplicados
+
+sismember users 5 → 1 Para validar si existe dentro del set
+sismember users 100 → 0
+
+srem users 100 → 0 Para eliminar un registro, como 100 no existe no afectó en nada
+srem users 5 → 1
+sismember users 5 → 0
+
+spop users → "3" Para eliminar de manera random un elemento
+
+*******************************
+
+#26. Set Intersection & Union
+
+sadd skill:java 1 2 3 4 → 4
+sadd skill:js 2 3 4 → 3
+sadd skill:aws 4 5 6 → 3
+
+Las personas que tienen los 3 skills:
+sinter skill:java skill:js skill:aws → "4"
+
+Los que saben java y js:
+sunion skill:java skill:js → "1" "2" "3" "4"
+
+sadd candidate:criminal 4 5 6 → 3
+
+Los que saben java y no tienen record criminal:
+sdiff skill:java candidate:criminal → "1" "2" "3"
+
+Para guardar el resultado en otro set:
+Intersect para los que saben java y js:
+sinterstore java-js skill:java skill:js → 3
+scard java-js → 3
+smembers java-js → "2" "3" "4"
+
+*******************************
+
+#28, 29. Sorted Set - Part 1 y 2
+
+Es un set ordenado.
+Use cases:
+- Priority Queue
+- top rated movie / product
+- frequently visited pages
+
+zadd products 0 books → 1 Para agregar items en el sorted set
+zadd products 0 iphone 0 tv → 2
+zcard products → 3 Para saber la longitud del set
+zincrby products 1 books → "1" Para simular ventas de productos
+zincrby products 1 iphone → "1"
+zincrby products 1 iphone → "2"
+zincrby products 1 tv → "1"
+
+Para mostrar el score o el rank de los productos
+zrange products 0 -1 → Para mostrar todo
+1)"books"
+2)"tv"
+3)"iphone"
+
+zincrby products 1 iphone → "3"
+zincrby products 1 books → "2"
+zrange products 0 -1 →
+1)"tv"
+2)"books"
+3)"iphone"
+Se ve que el orden es ascendente
+
+zrange products 0 -1 withscores → Para ver el score
+1)"tv"
+2)"1"
+3)"books"
+4)"2"
+5)"iphone"
+6)"3"
+
+Para ver el producto con el mayor score:
+zrange products -1 -1 → "iphone"
+zrange products 0 0 rev → "iphone" Otra manera de hacerlo
+zrange products 0 0 rev withscores →
+1)"iphone"
+2)"3"
+
+Para obtener el TOP 2 de productos:
+zrange products 0 1 rev withscores →
+1)"iphone"
+2)"3"
+3)"books"
+4)"2"
+
+Para saber el rank de un producto:
+zrank products books → 1
+zrank products iphone → 2
+
+zrevrank products iphone → 0 Haciéndolo en reversa se encuentra en la primera posición
+
+Para saber el score:
+zscore products iphone → "3"
+zscore products tv → "1"
+
+Para eliminar el producto con el máximo score
+zpopmax products →
+1)"iphone"
+2)"3"
+zpopmax products →
+1)"books"
+2)"2"
+
+zcard products → 1
 
 
+*******************************
+
+#32. Redis Transaction - Part 2
+
+set user:1:balance 1 → OK
+set user:2:balance 0 → OK
+get user:1:balance 1 → "1"
+
+decr user:1:balance → 0
+incr user:2:balance → 1
+
+En otra ventana:
+decr user:1:balance → -1
+incr user:2:balance → 2
+
+flushdb
+
+set user:1:balance 1 → OK
+set user:2:balance 0 → OK
+
+Para activar la transacción:
+CLIENTE 1:
+multi → OK
+decr user:1:balance → QUEUED
+incr user:2:balance → QUEUED
+
+CLIENTE 2:
+multi → OK
+decr user:1:balance → QUEUED
+incr user:2:balance → QUEUED
+
+CLIENTE 1:
+exec →
+1) 0
+2) 1
+
+CLIENTE 2:
+exec →
+1) -1
+2) 2
+
+Pienso que la diferencia está que con el modo "transacción" se procesan los request en bloque
+
+CLIENTE 1: 
+set user:1:balance 1 → OK
+set user:2:balance 0 → OK
+watch user:1:balance user:2:balance → OK
+multi → OK
+decr user:1:balance → QUEUED
+incr user:2:balance → QUEUED
 
 
+CLIENTE 2: 
+watch user:1:balance user:2:balance → OK
+multi → OK
+decr user:1:balance → QUEUED
+incr user:2:balance → QUEUED
 
 
+CLIENTE 1: 
+exec →
+1) 0
+2) 1
 
+CLIENTE 2:
+exec → (nil) Lo que pasó fue que el watch deshabilita la TRX si la llave fue modificada por otro cliente
+get user:1:balance → "0"
+get user:2:balance → "1"
 
+multi → OK
+decr user:1:balance → QUEUED
+incr user:2:balance → QUEUED
+discard → OK sirve para hacer rollback
 
+*******************************
+
+#33. Saving Data On Disk
+
+keys * → (empty array)
+
+En el container de redis:
+root@redis:/data# ls -al → total 8 No se ve data guardada
+
+set user:1:balance 1 → OK
+set user:2:balance 0 → OK
+root@redis:/data# ls -al → sigue sin aparecer nada
+
+bgsave → Background saving started 
+root@redis:/data# ls -al → Aparece un archivo: dump.rdb
+root@redis:/data# cat dump.rdb
+
+Se puede ver el contenido del archivo
 
 
 **********************************
