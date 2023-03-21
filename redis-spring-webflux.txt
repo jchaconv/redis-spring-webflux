@@ -557,5 +557,534 @@ Otras librerías: Jedis y Lettuce
 Tener en cuenta la wiki:
 https://github.com/redisson/redisson/wiki
 
+*******************************
 
+#40. Key Value
+
+Lec01KeyValueTest keyValueAccessTest:
+En este test se creó una key-value y se mostró el valor.
+
+En redis-cli se muestra lo siguiente:
+
+127.0.0.1:6379> get user:1:name
+"\x04>\x05julio"
+
+Se muestra así el valor porque no se ha realizado un encoded
+
+*******************************
+
+#42. Redisson Codec
+
+Lec01KeyValueTest keyValueAccessWithCodecTest
+
+Se agregó StringCodec.INSTANCE
+
+Se hizo un flushdb y se probó
+
+Ahora se muestra correctamente formateado:
+127.0.0.1:6379> get user:1:name
+"julio"
+
+*******************************
+
+#43. Bucket Expiry
+
+Lec01KeyValueTest keyValueExpiryTest
+
+Se agregó: bucket.set("julio", 30, TimeUnit.SECONDS);
+
+Se hizo un flushdb y se probó
+
+127.0.0.1:6379> keys *
+1) "user:1:name"
+127.0.0.1:6379> ttl user:1:name
+(integer) 14
+127.0.0.1:6379> ttl user:1:name
+(integer) -2
+127.0.0.1:6379> get user:1:name
+(nil)
+
+Lec01KeyValueTest keyValueExtendExpiryTest
+
+Se añadió una lógica para extender el ttl y mostrarlo
+
+Se hizo un flushdb y se probó
+
+127.0.0.1:6379> get user:1:name
+"julio"
+127.0.0.1:6379> ttl user:1:name
+(integer) 55
+127.0.0.1:6379> ttl user:1:name
+(integer) 48
+
+
+*******************************
+
+#44. Object Store
+
+El propósito es guardar un objeto Student en Redis
+
+Lec02BucketObjectTest keyValueObjectTest
+
+Se puede usar cualquiera de los dos para enviar la data formateada a Redis:
+
+-implements Serializable en la clase Student
+-JsonJacksonCodec.INSTANCE en el test
+
+Por defecto se guarda el nombre de la clase con JsonJacksonCodec, para quitarlo se agregó:
+new TypedJsonJacksonCodec(Student.class)
+
+En Intellij:
+Student(name=Marshall, age=10, city=Atlanta, marks=[1, 2, 3])
+
+En Redis:
+127.0.0.1:6379> get student:1
+"{\"age\":10,\"city\":\"Atlanta\",\"marks\":[1,2,3],\"name\":\"Marshall\"}"
+
+Sería interesante saber si al consumir esta data con esas barras causa algún conflicto o cómo guardar la info sin las barras.
+
+*******************************
+
+#45. Number Store
+
+El objetivo es guardar una key que incremente su valor en 1 cada segundo
+
+Lec03NumberTest keyValueIncreaseTest
+
+En este test destaca el uso de RAtomicLongReactive
+
+Al probar en redis se ve que incrementa de 1 en 1 hasta llegar a 30
+
+127.0.0.1:6379> get user:1:visit
+"18"
+127.0.0.1:6379> get user:1:visit
+"20"
+127.0.0.1:6379> get user:1:visit
+"21"
+127.0.0.1:6379> get user:1:visit
+"25"
+127.0.0.1:6379> get user:1:visit
+"30"
+127.0.0.1:6379> get user:1:visit
+"30"
+
+*******************************
+
+#46. Buckets As Map
+
+El objetivo es retornar la data de redis como un map en java.
+
+Lec04BucketAsMap bucketAsMap
+
+Se uso getBuckets para llamar a las keys.
+
+Se creó la data en redis:
+
+127.0.0.1:6379> set user:1:name aaron
+OK
+127.0.0.1:6379> set user:2:name ruti
+OK
+127.0.0.1:6379> set user:3:name julio
+OK
+
+Al ejecutar el test se obtiene:
+{user:1:name=aaron, user:2:name=ruti, user:3:name=julio}
+
+En caso de invocar a una llave que no exista redis solo la ignora y no rompe el test.
+
+
+*******************************
+
+#48. Expired Event Listener
+
+El propósito es notificar cuando la key haya expirado
+
+Lec05EventListenerTest expiredEventTest
+
+Es el mismo ejemplo de Lec01KeyValueTest keyValueExtendExpiryTest pero se agregó: bucket.addListener
+
+Las notifications están desactivadas por defecto en REDIS, para activarlas ejecutar en la consola:
+
+config set notify-keyspace-events AKE
+
+Reference: https://redis.io/topics/notifications#configuration
+
+127.0.0.1:6379> config set notify-keyspace-events AKE
+OK
+
+Se ejecuta el test y luego de 11secs se notifica automáticamente la expiración:
+
+En intellij:
+julio
+Expired : user:1:name
+
+
+*******************************
+
+#49. Deleted Event Listener
+
+El propósito es notificar cuando la key haya sido borrada
+
+Lec05EventListenerTest deletedEventListenerTest
+
+El test es igual que expiredEventTest de la misma clase pero se quitó el tiempo de expiración de la key
+También se cambió la implementación de bucket.addListener
+
+Al ejecutar el test vemos lo siguiente en redis:
+
+127.0.0.1:6379> keys *
+1) "user:1:name"
+
+Borramos la key:
+
+127.0.0.1:6379> del user:1:name
+(integer) 1
+
+Se notifica automáticamente en intellij:
+
+julio
+Deleted : user:1:name
+
+
+*******************************
+
+#50. Map - Part 1
+
+El objetivo es guardar un map en un hash de Redis:
+
+Lec06MapTest mapTest1
+
+Se usó getMap
+
+Redis Hash → Redisson Map
+
+127.0.0.1:6379> keys *
+1) "user:1"
+127.0.0.1:6379> get user:1
+(error) WRONGTYPE Operation against a key holding the wrong kind of value
+
+Sale error porque es un hash, se tiene que buscar así:
+127.0.0.1:6379> hgetall user:1
+1) "name"
+2) "Julio"
+3) "age"
+4) "27"
+5) "city"
+6) "Lima"
+
+También se puede buscar por la key:
+127.0.0.1:6379> hget user:1 name
+"Julio"
+
+
+Lec06MapTest mapTest2
+
+Aquí se creó un Map de java8 y se redujo el código, digamos que es otra manera de hacer el mismo test
+
+Ejecuté el test y en redis veo lo siguiente:
+
+127.0.0.1:6379> keys *
+1) "user:2"
+127.0.0.1:6379> hgetall user:2
+1) "name"
+2) "Ruti"
+3) "city"
+4) "Lima"
+5) "age"
+6) "30"
+
+*******************************
+
+#51. Map - Part 2
+
+El objetivo es tener un Map<Integer, Student> lo cual es más cercano a un caso real.
+Se usa un TypedJsonJacksonCodec para el formateo.
+
+Lec06MapTest mapTest3
+
+Se ejecutó el test y en redis:
+
+127.0.0.1:6379> keys *
+1) "users"
+127.0.0.1:6379> hgetall users
+1) "1"
+2) "{\"age\":27,\"city\":\"lima\",\"marks\":[1,2,3],\"name\":\"Julio\"}"
+3) "2"
+4) "{\"age\":30,\"city\":\"lima\",\"marks\":[10,20,30],\"name\":\"Ruti\"}"
+
+*******************************
+
+#52. Map Cache
+
+El objetivo es que se puede hacer expirar solo un "objeto" del map
+
+Lec07MapCacheTest mapCacheTest
+
+Se usó getMapCache. Se ejecuta el test y se valida en el mismo intellij:
+
+Al esperar los 3 segundos aparecen los objetos:
+
+Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+Student(name=Ruti, age=30, city=lima, marks=[10, 20, 30])
+
+Al esperar nuevamente solo aparece el objeto no expirado:
+
+Student(name=Ruti, age=30, city=lima, marks=[10, 20, 30])
+
+*******************************
+
+#53. Local Cached Map - Part 1
+
+LocalCachedMap no es parte de ReactiveRedisson por lo que se tiene que crear un nuevo cliente
+
+Lec08LocalCachedMapTest setupClient
+
+Sync Strategy:
+- None:       no se actualiza automáticamente
+- Invalidate: elimina el objeto de memoria
+- Update:     actualiza con lo que haya cambiado
+
+
+Reconnect Strategy:
+- Clear: Cuando se reestablece la conexión con Redis se limpia el Cache y se actualiza
+- None:  Parece que no hace nada y solo mantiene la data en cache.
+
+*******************************
+
+#54. Local Cached Map - Part 2
+
+Se agregan observers
+
+Lec08LocalCachedMapTest appServer1 y appServer2.
+Para las pruebas iniciales se utilizará:
+SyncStrategy.UPDATE
+ReconnectionStrategy.NONE
+
+Se ejecuta appServer1 y se muestra cada segundo la data del hash:
+10==>Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+11==>Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+12==>Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+
+
+Luego se ejecuta appServer2 mientras sigue en ejecución appServer1 y se actualiza el nombre:
+86==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+87==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+88==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+
+Para comprobar que se usa la copia local detengo el server de redis y se ve que se sigue mostrando la data
+al ejecutar appServer1.
+
+docker-compose down
+
+Cuando se usa el Sync Strategy NONE se ve que una vez ejeuctado appServer1 y luego appServer2
+no pasa nada porque la data no se actualiza. Sin embargo en Redis si se actualizó:
+127.0.0.1:6379> keys *
+1) "students"
+127.0.0.1:6379> hgetall students
+1) "1"
+2) "{\"age\":27,\"city\":\"lima\",\"marks\":[1,2,3],\"name\":\"Julio-Updated\"}"
+3) "2"
+4) "{\"age\":30,\"city\":\"lima\",\"marks\":[10,20,30],\"name\":\"Ruti\"}"
+
+Al cambiar a ReconnectionStrategy.CLEAR vemos que ejecutamos appServer1 y
+bajamos REDIS con docker-compose down, aparece lo sgte:
+
+103==>Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+104==>Student(name=Julio, age=27, city=lima, marks=[1, 2, 3])
+
+Se ejecuta: docker-compose up
+
+Aquí podemos ver que la data en cache ha sido borrada
+
+20:54:47.935 [parallel-1] DEBUG org.redisson.command.RedisExecutor - acquired connection for command (HGET) and params [students, PooledUnsafeDirectByteBuf(ridx: 0, widx: 1, cap: 256)] from slot NodeSource [slot=0, addr=null, redisClient=null, redirect=null, entry=null] using node 127.0.0.1/127.0.0.1:6379... RedisConnection@1158566375 [redisClient=[addr=redis://127.0.0.1:6379], channel=[id: 0x367877b3, L:/127.0.0.1:53447 - R:127.0.0.1/127.0.0.1:6379], currentCommand=null]
+20:54:47.936 [redisson-netty-5-5] DEBUG org.redisson.command.RedisExecutor - connection released for command (HGET) and params [students, PooledUnsafeDirectByteBuf(ridx: 0, widx: 1, cap: 256)] from slot NodeSource [slot=0, addr=null, redisClient=null, redirect=null, entry=null] using connection RedisConnection@1158566375 [redisClient=[addr=redis://127.0.0.1:6379], channel=[id: 0x367877b3, L:/127.0.0.1:53447 - R:127.0.0.1/127.0.0.1:6379], currentCommand=CommandData [promise=RedissonPromise [promise=ImmediateEventExecutor$ImmediatePromise@67102ecd(success)], command=(HGET), params=[students, PooledUnsafeDirectByteBuf(ridx: 0, widx: 1, cap: 256)], codec=org.redisson.codec.TypedJsonJacksonCodec]]
+139==>null
+140==>null
+141==>null
+
+Cabe mencionar que solo usando los comandos de docker compose se pudo hacer esta prueba, no fue igual el resultado con darle stop en docker desktop
+
+Cuando se ejecuta appServer2 recién se puede ver que se actualiza la data:
+
+205==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+206==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+207==>Student(name=Julio-Updated, age=27, city=lima, marks=[1, 2, 3])
+
+Al parecer necesita la actualización de la data en Redis para que pueda leer nuevamente el origen y generar una nueva copia en cache
+
+*******************************
+
+#56. List
+
+Lec09ListQueueStackTest listTest
+
+El código comentado tiene el mismo resultado. Solo que el que no está comentado es
+más eficiente porque solo hace un llamado a Redis. 
+
+Puede que la lista no se muestre en el orden en que se espera.
+
+En la programación tradicional se tiene que completar el list.add para continuar el loop.
+En reactive programming se están creando 10 publishers para enviar a redis.
+
+El código que quedó sin comentarios es para hacer una sola invocación a redis y no 10
+
+Para validar los datos en redis:
+
+lrange number-input 0 -1
+
+*******************************
+
+#57. Queue & Stack
+
+Lec09ListQueueStackTest queueTest
+
+La lista debe quedar creada con el test anterior.
+Se usó queue.poll() para borrar elementos y resultó así en redis:
+
+127.0.0.1:6379> lrange number-input 0 -1
+1) "5"
+2) "6"
+3) "7"
+4) "8"
+5) "9"
+6) "10"
+
+
+Lec09ListQueueStackTest stackTest
+
+En el ejemplo de Stack que es Deque se eliminaron:
+
+10
+9
+8
+7
+
+Se usó deque.pollLast()
+
+127.0.0.1:6379> lrange number-input 0 -1
+1) "5"
+2) "6"
+
+
+*******************************
+
+#58. Message Queue
+
+Lec10MessageQueueTest consumer1, consumer2 y producer
+
+Se utiliza Redis como un messagequeue. Se ejecuta consumer1 y se queda esperando
+luego el producer y se ve que consumer1 lee la data de redis, luego se corre consumer2 
+y ambos consumers toman la data sin repetirla(no duplicate processing).
+
+
+Por lo que veo solo se usa redis como msgqueue pero no se guarda un objeto
+
+*******************************
+
+#59. HyperLogLog
+
+Lec11HyperLogLogTest count
+
+Trabaja con probabilidades.
+
+*******************************
+
+#60. Pub Sub
+
+Publisher -> Subscriber
+Si un mensaje es publicado los subscribers lo reciben
+
+Lec12PubSubTest subscriber1, subscriber2
+
+Para replicar este ejemplo usar subscriber1 y clonarlo cambiando de nombre al método.
+
+Ejecutar los test individualmente y dejar esperando.
+En redis:
+127.0.0.1:6379> publish slack-room hi
+(integer) 2
+127.0.0.1:6379> publish slack-room "hello guys how are u?"
+Se usan comillas cuando el texto tiene espacio
+
+En las consolas de intellij se ve que nuestros subscribers leyeron
+la info correctamente.
+
+Se terminó una consola de test y se agregó nuevo mensaje el cual es
+leído bien por el subscriber activo. Cuando iniciamos el otro test no
+aparece ningún mensaje. Solo funciona con subscribers activos.
+
+*******************************
+
+#61. Pub Sub Pattern
+
+Para que un subscriber pueda escuchar de diferentes publishers
+
+Lec12PubSubTest subscriber1, subscriber2
+
+127.0.0.1:6379> publish slack-room1 hello
+(integer) 2
+127.0.0.1:6379> publish slack-room2 hello2
+(integer) 1
+
+Los mensajes se muestran en el subscriber2 y en el 1 solo los de slack-room1
+
+*******************************
+
+#62. Batch / Redis Pipeline
+
+Para procesamiento grande
+
+Lec13BatchTest batchTest
+Se agregaron 500K numeros a una lista y a un set
+
+Se realizó en 9secs
+127.0.0.1:6379> scard numbers-set
+(integer) 500000
+
+Hacer un flushdb
+
+Se hizo el regularTest para ver cuánto demora sin batch y es muy notable la diferencia.
+El test se tardó 1min 40secs
+
+*******************************
+
+#63. Transaction
+
+Lec14Transaction nonTransactionTest
+
+A pesar del error de la división entre cero se ve que igual se hace la transferencia:
+[50,50]
+
+Lec14Transaction transactionTest
+Con el Transaction tengo la posibilidad de hacer commit y rollback en caso de error
+
+[100,0]
+
+Comentar la línea del error para ver el caso de éxito
+
+*******************************
+
+#65. Sorted Set
+
+Lec15SortedSetTest sortedTest
+
+sortedSet.addScore("julio", 12.25);
+Esta línea valida automáticamente si "julio" existe y de ser así
+reemplaza el value actual, sino lo crea.
+
+Al ejecutar el test se ve que el registro de "aaron" aumenta mientras que
+"ruti" no porque solo está usando add()
+
+21.0 : aaron
+23.26 : ruti
+
+*******************************
+
+67. ASSIGNMENT SOLUTION - Priority Queue
+
+Lec16PriorityQueueTest(buscar en la carpeta test/assignment)
+
+Primero ejecutar el producer y luego el consumer
+Se ve que muestra los items en el orden esperado(PRIME -> STD -> GUEST)
+Se generan varios registros en el nuevo test y se ve que una vez terminado
+el producer, el consumer ordena los valores correctamente.
 
