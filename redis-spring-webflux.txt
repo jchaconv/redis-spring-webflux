@@ -1088,3 +1088,256 @@ Se ve que muestra los items en el orden esperado(PRIME -> STD -> GUEST)
 Se generan varios registros en el nuevo test y se ve que una vez terminado
 el producer, el consumer ordena los valores correctamente.
 
+**********************************
+SECCIÓN 5: Spring Webflux Caching 
+**********************************
+
+Crear el proyecto redis-spring con las dependencias:
+- Spring Data Reactive Redis
+- Spring Reactive Web
+- Lombok
+
+Usar una versión estable de spring boot como 2.7.9 para evitar
+errores de compilación.
+
+Agregar con File -> New -> Module from existing sources
+
+Si no es para config local:
+
+spring.redis.host=10.11.12.13
+spring.redis.port=6379
+
+*******************************
+
+72. Spring Data Redis vs Redisson
+
+En RedisSpringApplicationTests se crearon los métodos:
+
+@RepeatedTest(3)
+springDataRedisTest
+
+Se valida cuánto tiempo demora la generación de items en las 3 repeticiones
+29078
+29632
+29058
+
+Comentar la dependencia de redis-reactive y agregar:
+<dependency>
+  <groupId>org.redisson</groupId>
+  <artifactId>redisson-spring-boot-starter</artifactId>
+  <version>3.16.0</version>
+</dependency>
+
+flushdb y ejecutar otra vez el test. El resultado es casi igual, de hecho en mi pc
+demora más:
+39076
+34342
+33939
+
+Se crea el método redissonTest. Al probar demora más, sin embargo en el video demora mucho menos:
+45107
+42189
+43513
+
+La lección consiste en que spring data reactive tiene problemas de performance y es mejor usar redisson.
+
+*******************************
+
+73. Cache Aside Pattern
+74. Fib Service
+
+Se creó el package /fib
+Al invocar al servicio: http://localhost:8080/fib/10
+Me retorna el número que corresponde pero cuando envío /45
+o un número mayor se toma demasiado tiempo en responder.
+
+
+*******************************
+
+75. @Cacheable - Part 1
+
+Skip the method execution if the key is present.
+Do the method execution only if the key is not present and store the result.
+
+RedissonCacheConfig class in the fib/config/ package
+
+@Cacheable("math:fib") in the method getFib() of the FibService class
+This create a hash in Redis
+
+@EnableCaching in the main class : RedisSpringApplication
+
+Al ejecutar se puede ver que guarda en cache la información y no la vuelve a "pedir" o "procesar"
+Calculating fib for 2
+Calculating fib for 5
+Calculating fib for 45
+
+En redis:
+127.0.0.1:6379> keys *
+1) "math:fib"
+127.0.0.1:6379> type math:fib
+hash
+127.0.0.1:6379> hgetall math:fib
+1) "\x04K\x00\x00\x00\x02"
+2) "\x04K\x00\x00\x00\x01"
+3) "\x04K\x00\x00\x00\x05"
+4) "\x04K\x00\x00\x00\x05"
+5) "\x04K\x00\x00\x00-"
+6) "\x04KC\xa5?\x82"
+
+*******************************
+
+76. @Cacheable - Part 2
+
+String name was added in service and controller
+
+http://localhost:8080/fib/45/aaron
+
+if the name change then the program take time to calculate, but this is not necessary
+Calculating fib for 45, name: julio
+Calculating fib for 45, name: aaron
+
+To fix this, add in getFib of FibService:
+@Cacheable(value = "math:fib", key = "#index")
+index was added because is the field that need to be calculated
+
+Do a flush db and test.
+Calculating fib for 45, name: julio
+This time when I change the name it doesn't take time or do an additional process
+
+*******************************
+
+77. Cache Evict
+
+Do the method execution always and evict the corresponding cache
+Evict happens after method execution
+
+it is necessary to have a strategy for cache evict
+this annotation is util when you use POST/PUT/PATCH/DELETE
+
+i commented the methods that include string name for this test
+
+Calculating fib for 45
+Calculating fib for 46
+
+When I invoke:
+http://localhost:8080/fib/46
+Then:
+clearing hash key
+Calculating fib for 46
+
+When I use Cache Evict the hash key is deleted
+
+*******************************
+
+78. Scheduled Cache Evict
+
+I added the method:
+
+Every ten seconds it will delete the cache
+
+@Scheduled(fixedRate = 10_000)
+@CacheEvict(value = "math:fib", allEntries = true)
+public void clearCache() {
+    System.out.println("clearing all math:fib keys");
+}
+
+And I added this annotation in the main class:
+@EnableScheduling
+
+*******************************
+
+79. @CachePut - Part 1
+
+Do the method execution always and update the corresponding cache
+Is like a hibrid between @Cacheable and @CacheEvict
+
+See the /weather package
+
+http://localhost:8080/weather/3
+
+In this example of weather application we use the data of redis not of the serviceClient
+
+*******************************
+
+81. Cache Annotation Limitations
+
+- No TTL support
+- Not a lot of flexibility
+- Does not work with publisher types!!!
+  (Not support reactive classes like Mono<Product>)
+
+*******************************
+
+83. City Service - Client
+84. City Service
+
+In a console execute the "external service" with this:
+java -jar city-api.jar
+
+Add in application.properties:
+city.service.url=http://localhost:3030/open-city-api/
+
+http://localhost:3030/open-city-api/10001
+http://localhost:3030/open-city-api/30005
+
+{
+"zip": "10001",
+"lat": 40.75065,
+"lng": -73.99718,
+"city": "New York",
+"stateId": "NY",
+"stateName": "New York",
+"population": 24117,
+"density": 15153.7,
+"temperature": 92
+}
+
+The files are in /city folder
+
+In CityService:
+put replace while fastput just "put"
+
+85. City Service - Controller
+
+do a flushdb and run the application
+
+Invoke:
+http://localhost:8080/city/10001
+
+{
+"zip": "10001",
+"city": "New York",
+"stateName": "New York",
+"temperature": 64
+}
+
+In redis:
+127.0.0.1:6379> keys *
+1) "city"
+2) "weather"
+127.0.0.1:6379> type city
+hash
+127.0.0.1:6379> hgetall city
+1) "\"10001\""
+2) "{\"city\":\"New York\",\"stateName\":\"New York\",\"temperature\":64,\"zip\":\"10001\"}"
+
+*******************************
+
+87. Setting TTL
+
+the modifications are in the CityService with comments like //TTL
+
+it remove all the entries from redis
+
+127.0.0.1:6379> keys *
+1) "redisson__execute_task_once_latch:{city}"
+
+*******************************
+
+89. ASSIGNMENT
+
+I commented the previous example to do this.
+
+With this changes in CityService and CityClient it is possible to get any zipcode 
+in a fast way.
+
