@@ -1,8 +1,22 @@
-version: '3'
+version: "3"
 services:
-  redis:
-    container_name: redis
-    hostname: redis
-    image: redis:6.2
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     ports:
-    - 6379:6379
+      - "5432:5432"
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "9000:80"
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"

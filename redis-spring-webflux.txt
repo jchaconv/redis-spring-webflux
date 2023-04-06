@@ -1341,3 +1341,180 @@ I commented the previous example to do this.
 With this changes in CityService and CityClient it is possible to get any zipcode 
 in a fast way.
 
+
+**********************************************
+SECCIÓN 6: Spring Webflux & Redis Performance 
+**********************************************
+
+Create the project redis-performance with the dependencies:
+- Spring Data R2DBC
+- Spring Reactive Web
+- Lombok
+_ PostgreSQL Driver
+
+docker-compose.yml updated on Github
+
+Execute in a console:
+docker-compose up      
+  
+Add in properties:
+
+spring.r2dbc.url=r2dbc:postgresql://localhost:5432/postgres
+spring.r2dbc.username=postgres
+spring.r2dbc.password=postgres
+
+Table creation sql, crete the file resources/schema.sql:
+
+DROP TABLE IF EXISTS product;
+CREATE TABLE product(
+   id serial PRIMARY KEY,
+   description VARCHAR (500),
+   price numeric (10,2) NOT NULL
+);
+
+Run the application and test in postman:
+http://localhost:8080/product/1
+Tests success
+
+*******************************
+JMETER:
+
+There is a difference between:
+${__Random(1,1000,)} and ${random}
+In the second option there is an additional file(PreProcessor) that contains:
+vars.put("random", "${__Random(1,1000)}");
+
+The ramp-up period tells JMeter how long to take to "ramp-up" to the full number of threads chosen. 
+If 10 threads are used, and the ramp-up period is 100 seconds, then JMeter will take 100 seconds to
+get all 10 threads up and running. Each thread will start 10 (100/10) seconds after the previous thread was begun.
+
+Configuration in GET:
+threads: 180
+Ramp-up: 30
+Infinite: check
+Checks in the next three
+Duration: 60
+
+Configuration in PUT:
+threads: 20
+Ramp-up: 30
+Infinite: check
+Checks in the next three
+Duration: 60
+
+Disable the Results tree because it consumes lots of memory
+We can see the interaction in Aggregate Report(the option at the final)
+
+Then run the test for 5 minutes changing the Duration to 300 in GET and PUT
+
+To run the test by console:
+
+/bin
+./jmeter -n -t redis-course/product-service.jmx -l redis-course/v1.jtl
+
+*******************************
+
+105. Product Service - V2 - Demo
+
+
+Test the app:
+
+http://localhost:8080/product/v2/1
+{
+    "id": 1,
+    "description": "product1",
+    "price": 83.0
+}
+
+In redis:
+127.0.0.1:6379> keys *
+1) "product"
+127.0.0.1:6379> hget product 1
+"{\"description\":\"product1\",\"id\":1,\"price\":83.0}"
+
+Execute the PUT method:
+{
+    "id": 1,
+    "description": "product1",
+    "price": 33.0
+}
+127.0.0.1:6379> hget product 1
+(nil)
+
+
+When you test again the GET method you see that data has been changed
+
+The DELETE test works fine.
+
+
+*******************************
+
+108. Product Service - V3 - Demo
+
+Se crea ProductLocalCacheTemplate con los métodos correspondientes.
+Hay cambios significativos en el constructor y en los métodos GET, PUT y DELETE.
+
+Se comenta el @Service de ProductCacheTemplate para que no haga conflicto con esta
+nueva implementación.
+
+flushdb en redis y correr en una consola:
+
+mvn clean package -DskipTests
+
+java -jar target/redis-performance-0.0.1-SNAPSHOT.jar
+
+Si sale error por la conexión con postgres, levantar el container.
+
+En otra consola:
+
+java -jar target/redis-performance-0.0.1-SNAPSHOT.jar --server.port=7070
+
+Ejecutar en postman:
+
+http://localhost:8080/product/v2/1
+
+Retorna en 259ms:
+{
+    "id": 1,
+    "description": "product1",
+    "price": 53.0
+}
+
+en redis:
+127.0.0.1:6379> keys *
+1) "product"
+127.0.0.1:6379> hgetall product
+1) "1"
+2) "{\"description\":\"product1\",\"id\":1,\"price\":53.0}"
+
+Al hacer el request en postman varias veces demora de 5ms a 8ms.
+Al hacerlo con el port 7070 ocurre lo mismo
+
+Hacer el update:
+http://localhost:8080/product/v2/1
+{
+    "id": 1,
+    "description": "product1",
+    "price": 18.0
+}
+Retorna 200, validar el get nuevamente y se actualiza la info, también en redis.
+127.0.0.1:6379> hgetall product
+1) "1"
+2) "{\"description\":\"product1\",\"id\":1,\"price\":18.0}"
+
+Hacer el DELETE con el port 7070:
+http://localhost:7070/product/v2/1
+
+GET con 8080:
+http://localhost:8080/product/v2/1
+No aparece info, está bien
+Y en redis:
+127.0.0.1:6379> hgetall product
+(empty array)
+
+*******************************
+
+
+
+
+*******************************
