@@ -1512,6 +1512,38 @@ Y en redis:
 127.0.0.1:6379> hgetall product
 (empty array)
 
+
+
+***************************************
+SECCIÓN 7: Trending Service Assignment
+***************************************
+
+Se crearon las clases:
+ProductVisitService
+BusinessMetricService
+BusinessMetricController
+
+Se modificó el getProduct de ProductServiceV2
+
+Probar con postman:
+
+./jmeter -n -t redis-course/product-service.jmx
+
+En el browser:
+localhost:8080/product/metrics
+
+Aparecen los productos y la data
+
+*******************************
+
+
+
+
+*******************************
+
+
+
+
 *******************************
 
 
