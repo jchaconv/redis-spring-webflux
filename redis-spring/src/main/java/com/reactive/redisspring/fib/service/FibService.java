@@ -15,7 +15,8 @@ public class FibService {
     }*/
 
     //for cache evict example
-    @Cacheable(value = "math:fib", key = "#index")
+    //para probar chat
+    /*@Cacheable(value = "math:fib", key = "#index")
     public int getFib(int index) {
         System.out.println("Calculating fib for " + index);
         return this.fib(index);
@@ -36,6 +37,6 @@ public class FibService {
         if(index < 2)
             return index;
         return fib(index -1) + fib(index - 2);
-    }
+    }*/
 
 }

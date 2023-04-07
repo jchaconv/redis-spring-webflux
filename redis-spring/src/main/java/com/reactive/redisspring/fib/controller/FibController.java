@@ -23,12 +23,14 @@ public class FibController {
     //for cache evict example
     @GetMapping("{index}")
     public Mono<Integer> getFib(@PathVariable int index) {
-        return Mono.fromSupplier(() -> this.service.getFib(index));
+        //return Mono.fromSupplier(() -> this.service.getFib(index)); para probar chat
+        return null;
     }
 
     @GetMapping("{index}/clear")
     public Mono<Void> clearCache(@PathVariable int index) {
-        return Mono.fromRunnable(() -> this.service.clearCache(index));
+        return null;
+        //return Mono.fromRunnable(() -> this.service.clearCache(index)); para probar chat
     }
 
 }

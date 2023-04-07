@@ -41,7 +41,8 @@ public class CityService {
                 );
     }*/
 
-    public Mono<City> getCity(final String zipCode) {
+    //Para probar chat
+    /*public Mono<City> getCity(final String zipCode) {
         return this.cityMap.get(zipCode)
                 //.switchIfEmpty(this.client.getCity(zipCode)) Both are fine
                 .onErrorResume(ex -> this.client.getCity(zipCode));
@@ -54,6 +55,6 @@ public class CityService {
                 .map(list -> list.stream().collect(Collectors.toMap(City::getZip, Function.identity())))
                 .flatMap(this.cityMap::putAll)
                 .subscribe();
-    }
+    }*/
 
 }

@@ -18,7 +18,8 @@ public class CityController {
 
     @GetMapping("{zipcode}")
     public Mono<City> getCity(@PathVariable String zipcode) {
-        return this.service.getCity(zipcode);
+        return null;
+        //return this.service.getCity(zipcode); para probar chat
     }
 
 
