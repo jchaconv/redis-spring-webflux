@@ -1536,6 +1536,208 @@ Aparecen los productos y la data
 
 
 
+*******************************************
+SECCIÓN 8: Chat Application with WebSocket
+*******************************************
 
 
+SSE(Server sent events):
+-1 way
+-text message
+-Ex: stock price update, weather updates
+
+WebSocket
+-2 way
+-binary/text
+-ex: chat application
+
+El mayor desafío es pensar en el app con varias intancias
+Redis se encarga de proporcionar toda la data.
+
+*******************************
+
+En redis-spring se creo /chat
+
+En el service está WebSocketSession que maneja toda la interacción
+entre el backend y client. Los métodos más importantes son el send y receive.
+
+Levantar el app
+
+Añadir web socket test client extension a Chrome
+Y abrir el client en dos ventanas y probar enviando mensajes
+
+
+
+********************************
+SECCIÓN 9: Redis Authentication 
+********************************
+
+acl list                              : show current users
+acl whoami                            : current user
+acl setuser [username] >[password]    : creates an user with password
+acl setuser [username] nopass         : creates an user with no password
+acl setuser [username] on             : enables the user
+acl setuser [username] off            : disables the user
+acl deluser [username]                : removes the user
+
+auth [username] [password]
+
+*******************************
+
+128. Access Control List - Introduction
+
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+127.0.0.1:6379> acl deluser default
+(error) ERR The 'default' user cannot be removed
+127.0.0.1:6379> acl whoami
+"default"
+127.0.0.1:6379> acl setuser julio >secret
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user julio off #2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b resetchannels -@all"
+127.0.0.1:6379> acl deluser julio
+(integer) 1
+127.0.0.1:6379> acl setuser julio >pass123 on
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user julio on #9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c resetchannels -@all"
+127.0.0.1:6379> acl setuser julio off
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user julio off #9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c resetchannels -@all"
+127.0.0.1:6379> acl setuser julio on
+OK
+127.0.0.1:6379> auth julio pass123
+OK
+127.0.0.1:6379> acl whoami → El comando falla porque el usuario julio no tiene permisos para ejecutar acl
+(error) NOPERM this user has no permissions to run the 'acl|whoami' command
+127.0.0.1:6379> auth default nopass
+OK
+127.0.0.1:6379> acl whoami
+"default"
+
+*******************************
+
+129. Access Control List - Setting Up Permissions
+
+allcommands / +@all             : access to all commands in redis
+-get, -set...                   : no access to get, set commands
++@set, +@hash, +@list           : access set and hash related commands
+allkeys / ~*                    : access to all the keys in redis
+~numbers:*                      : access to keys starting with numbers
+
+
+
+127.0.0.1:6379> acl whoami
+"default"
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+127.0.0.1:6379> acl setuser sam >pass123 on allcommands allkeys
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user sam on #9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c ~* resetchannels +@all"
+127.0.0.1:6379> auth sam pass123
+OK
+127.0.0.1:6379> acl whoami
+"sam"
+127.0.0.1:6379> set a 1
+OK
+127.0.0.1:6379> rpush users 1 2 3
+(integer) 3
+127.0.0.1:6379> keys *
+1) "users"
+2) "a"
+
+
+127.0.0.1:6379> auth default nopass
+OK
+127.0.0.1:6379> acl whoami
+"default"
+127.0.0.1:6379> acl setuser sam -get
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user sam on #9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c ~* resetchannels +@all -get"
+127.0.0.1:6379> auth sam pass123
+OK
+127.0.0.1:6379> acl whoami
+"sam"
+127.0.0.1:6379> keys *
+1) "users"
+2) "a"
+127.0.0.1:6379> get a → Con esto le quito los permisos de get al user
+(error) NOPERM this user has no permissions to run the 'get' command
+
+
+
+127.0.0.1:6379> auth default nopass
+OK
+127.0.0.1:6379> acl setuser sam -@dangerous → Aquí le quito permisos para comandos peligrosos como flushdb
+OK
+127.0.0.1:6379> acl list
+1) "user default on nopass ~* &* +@all"
+2) "user sam on #9b8769a4a742959a2d0298c36fb70623f2dfacda8436237df08d8dfd5b37374c ~* resetchannels +@all -@dangerous -get"
+127.0.0.1:6379> auth sam pass123
+OK
+127.0.0.1:6379> acl whoami
+"sam"
+127.0.0.1:6379> set a b
+OK
+127.0.0.1:6379> get a
+(error) NOPERM this user has no permissions to run the 'get' command
+127.0.0.1:6379> keys *
+(error) NOPERM this user has no permissions to run the 'keys' command
+127.0.0.1:6379> flushdb
+(error) NOPERM this user has no permissions to run the 'flushdb' command
+
+*******************************
+
+Para usar con springdata:
+spring.redis.username
+spring.redis.password
+
+En el proyecto redisson-playground test/config/RedissonConfig se agregó el user y password
+
+Al ejecutar Lec01KeyValueTest keyValueAccessTest falla por falta de permisos
+
+Pero si ejecuto Lec11HyperLogLogTest count si funciona porque si tiene los permisos para esto.
+
+*******************************
+
+132. Redis Default User Credentials
+
+Para cambiar el password al user default
+
+127.0.0.1:6379> acl whoami
+"default"
+127.0.0.1:6379> config set requirepass pass1234
+OK
+127.0.0.1:6379> auth default nopass
+(error) WRONGPASS invalid username-password pair or user is disabled.
+127.0.0.1:6379> exit
+root@77d35f910f83:/data# redis-cli
+127.0.0.1:6379> keys *
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth default pass1234
+OK
+127.0.0.1:6379> keys *
+1) "user:1:name"
+2) "user:visits"
+3) "a"
+127.0.0.1:6379> config set requirepass ""
+OK
+127.0.0.1:6379> auth default nopass
+OK
+
+*******************************
+
+133. Redis Configuration
+
+
+https://redis.io/docs/management/config/
 
